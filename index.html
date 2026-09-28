@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wage Curve Pipeline</title>
+  <meta name="description" content="Watch a CSV flow through validation, cleaning, feature engineering and model training to estimate how wages change with education and experience.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <p class="eyebrow">Data pipeline · Regression · Prediction</p>
+      <h1>How do education and experience shape a person's wage?</h1>
+      <p class="lede">Upload a CSV and watch every row travel through the pipeline: it gets validated, cleaned, turned into model features, used to train a regression, and finally comes out as a predicted wage curve.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="panel controls" aria-label="Input">
+      <label id="dropzone" class="dropzone" tabindex="0">
+        <input id="file" type="file" accept=".csv,text/csv" hidden>
+        <span class="dz-icon" aria-hidden="true">📁</span>
+        <span class="dz-text"><b>Drop a CSV here</b> or click to browse<br><small>Needs columns <code>wage</code>, <code>educ</code>, <code>exper</code> · optional <code>tenure</code>, <code>female</code>, <code>married</code></small></span>
+      </label>
+      <div class="control-row">
+        <div class="file-chip" id="fileChip">Using sample <b>wage1.csv</b> · 526 rows</div>
+        <label class="check"><input type="checkbox" id="messy"> Add messy rows <small>(shows the cleaning step at work)</small></label>
+        <label class="select">Speed
+          <select id="speed">
+            <option value="1">Normal</option>
+            <option value="0.4">Fast</option>
+            <option value="0">Instant</option>
+          </select>
+        </label>
+        <button id="run" class="btn primary">▶ Run pipeline</button>
+      </div>
+    </section>
+
+    <section id="pipeline" class="pipeline" aria-label="Pipeline stages">
+      <canvas id="flow" aria-hidden="true"></canvas>
+      <div class="stage" data-stage="upload">
+        <div class="station"><span>📁</span></div>
+        <article class="card">
+          <header><h2>Upload</h2><p class="status">Waiting for a file</p></header>
+          <div class="progress"><i></i></div>
+          <div class="details"></div>
+        </article>
+      </div>
+      <div class="stage" data-stage="validate">
+        <div class="station"><span>🔍</span></div>
+        <article class="card">
+          <header><h2>Validation</h2><p class="status">Checking schema</p></header>
+          <div class="progress"><i></i></div>
+          <div class="details"></div>
+        </article>
+      </div>
+      <div class="stage" data-stage="clean">
+        <div class="station"><span>🧹</span></div>
+        <article class="card">
+          <header><h2>Cleaning</h2><p class="status">Missing values · duplicates · invalid values</p></header>
+          <div class="progress"><i></i></div>
+          <div class="details"></div>
+        </article>
+      </div>
+      <div class="stage" data-stage="transform">
+        <div class="station"><span>⚙️</span></div>
+        <article class="card">
+          <header><h2>Transform</h2><p class="status">Feature creation</p></header>
+          <div class="progress"><i></i></div>
+          <div class="details"></div>
+        </article>
+      </div>
+      <div class="stage" data-stage="train">
+        <div class="station"><span>🤖</span></div>
+        <article class="card">
+          <header><h2>ML model</h2><p class="status">Training</p></header>
+          <div class="progress"><i></i></div>
+          <div class="details"></div>
+        </article>
+      </div>
+      <div class="stage" data-stage="predict">
+        <div class="station"><span>📊</span></div>
+        <article class="card">
+          <header><h2>Prediction</h2><p class="status">wage_forecast</p></header>
+          <div class="progress"><i></i></div>
+          <div class="details"></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="results" class="results" hidden>
+      <h2 class="section-title">Results</h2>
+      <div id="tiles" class="tiles"></div>
+      <p id="narrative" class="narrative"></p>
+
+      <article class="panel">
+        <h3>Sample regression curves vs. the estimated population curve</h3>
+        <p class="sub">Every thin line is a regression curve fitted to a different random resample of the data (a <em>sample regression function</em>). Together they show how much one sample can mislead. The thick line is the model's best estimate of the <em>population</em> curve, with a 95% band. Other factors are held at their averages.</p>
+        <div class="legend" id="legendA"></div>
+        <div id="chartEduc"></div>
+      </article>
+
+      <div class="grid-2">
+        <article class="panel">
+          <h3>Wage over a career, by education</h3>
+          <p class="sub">The squared-experience term lets the curve bend: pay rises quickly early on, flattens, then peaks.</p>
+          <div class="legend" id="legendB"></div>
+          <div id="chartExper"></div>
+        </article>
+        <article class="panel predictor">
+          <h3>Predict a wage</h3>
+          <p class="sub">Move the sliders. The model predicts the average hourly wage for someone with this profile.</p>
+          <div id="predictorForm" class="predictor-form"></div>
+          <div class="predict-out">
+            <div class="big" id="predValue">–</div>
+            <div class="muted" id="predRange"></div>
+            <div class="range-bar" id="predBar"><span class="pi"></span><span class="ci"></span><span class="pt"></span></div>
+            <div class="range-legend"><span><i class="k-pi"></i>95% range for one person</span><span><i class="k-ci"></i>95% range for the average</span></div>
+          </div>
+        </article>
+      </div>
+
+      <div class="grid-2">
+        <article class="panel">
+          <h3>Predicted vs. actual (held-out test rows)</h3>
+          <p class="sub">Rows the model never saw during training. Points on the dashed line are perfect predictions.</p>
+          <div id="chartPva"></div>
+        </article>
+        <article class="panel">
+          <h3>What moves the wage?</h3>
+          <p class="sub">Estimated % change in hourly wage per one-unit change, with 95% intervals. Experience is evaluated at the average career length.</p>
+          <div id="chartEffects"></div>
+        </article>
+      </div>
+
+      <article class="panel">
+        <div class="table-head">
+          <h3>Predictions on the test set</h3>
+          <button id="download" class="btn">⬇ Download all predictions (CSV)</button>
+        </div>
+        <div class="table-wrap"><table id="predTable" class="data"></table></div>
+      </article>
+
+      <article class="panel method">
+        <h3>How the model works</h3>
+        <div id="method"></div>
+      </article>
+    </section>
+  </main>
+
+  <footer class="wrap footer">Runs entirely in your browser. Nothing is uploaded to a server.</footer>
+
+  <script src="js/sample-data.js"></script>
+  <script src="js/pipeline.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/flow.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
